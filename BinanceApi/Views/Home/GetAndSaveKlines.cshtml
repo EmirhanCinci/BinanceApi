@@ -1,0 +1,58 @@
+﻿@using BinanceApi.Models
+@model List<Kline>
+
+@functions {
+    public DateTime UnixTimeStampToTurkeyDateTime(double unixTimeStamp)
+    {
+        // Unix zaman damgasını DateTime'a çevirme ve Türkiye saati (GMT+3) uygula
+        var dateTimeOffset = DateTimeOffset.FromUnixTimeMilliseconds((long)unixTimeStamp);
+        return dateTimeOffset.ToOffset(new TimeSpan(3, 0, 0)).DateTime;
+    }
+}
+
+<table class="table">
+    <thead>
+        <tr>
+            <th scope="col">sembol</th>
+            <th scope="col">zaman</th>
+            <th scope="col">açılış fiyatı</th>
+            <th scope="col">kapanış fiyatı</th>
+            <th scope="col">hacim</th>
+
+        </tr>
+    </thead>
+    <tbody>
+            @foreach (var item in Model)
+            {
+            <tr>
+                <td>@item.Symbol</td>
+                <td>@UnixTimeStampToTurkeyDateTime(item.OpenTime)</td>
+                <td>@item.Open</td>
+                <td>@item.Close</td>
+                <td>@item.Volume</td>
+            </tr>
+            }
+    </tbody>
+</table>
+
+<script src="~/microsoft-signalr/signalr.js"></script>
+<script src="~/microsoft-signalr/signalr.min.js"></script>
+<script>
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl("/HubService") // Adjust the URL to your SignalR endpoint
+        .configureLogging(signalR.LogLevel.Information)
+        .build();
+
+    connection.start().then(function () {
+        connection.invoke("GetList").catch(function (err) {
+            return console.error(err.toString());
+        });
+    }).catch(function (err) {
+        return console.error(err.toString());
+    });
+
+    connection.on("GetKlinesAsync", function (klineData) {
+        // Handle the received data, e.g., update your UI
+        console.log(klineData);
+    });
+</script>       

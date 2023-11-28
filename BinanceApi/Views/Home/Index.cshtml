@@ -1,0 +1,30 @@
+﻿@{
+    ViewData["Title"] = "Home Page";
+
+
+}
+@using BinanceApi.Models
+@model RootObject
+
+<table class="table">
+    <thead>
+        <tr>
+            <th scope="col">#</th>
+            <th scope="col">Coin İsmi</th>
+            <th scope="col">Fiyat Değişimi</th>
+            <th scope="col">Hacim Değişimi</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            @foreach (var item in Model.Symbols)
+            {
+                <th >@item.Symbols</th>
+                <td>@ViewBag.priceChange</td>
+                <td>@ViewBag.percentageChange</td>
+            }
+
+
+        </tr>
+    </tbody>
+</table>

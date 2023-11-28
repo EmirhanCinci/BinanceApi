@@ -1,0 +1,179 @@
+﻿@* @(Html.DevExtreme().Chart()
+    .ID("chart")
+    .Title("BTC Fiyat & Hacim")
+    .Series(s =>
+    {
+        s.Add()
+            .Type(SeriesType.Candlestick)
+            .ArgumentField("OpenTime") //x-ekseni
+            .ValueField("Open") //y-ekseni
+            .Pane("OpenPrice")
+            .Aggregation(a =>           //Toplama işlemi yapar
+                a.Enabled(true)
+                .Calculate((@<text>
+                    function(e) {
+                    var prices = e.data.map(function(i) { return i.price; });
+                    if(prices.length) {
+                    return {
+                    OpenTime: new Date((e.intervalStart.valueOf() + e.intervalEnd.valueOf()) / 2),
+                    Open: prices[1],
+                    Close: prices[2],
+                    Volume: prices[3],
+                    Symbol: prices[4]
+                    };
+                    }
+                    }
+                </text>))
+                .Method(ChartSeriesAggregationMethod.Custom));
+        s.Add()
+            .Type(SeriesType.Bar)
+            .ArgumentField("OpenTime")
+            .ValueField("Volume")
+            .Color("red")
+            .Pane("Volume")
+            .Name("Volume");
+    })
+    .CustomizePoint((@<text>
+        function(arg) {
+        if(arg.seriesName === "Volume") {
+        var ohlc = $("#chart").dxChart("getAllSeries")[0].getPointsByArg(arg.argument)[0].data;
+        if(ohlc.close >= ohlc.open) {       //kapanış fiyatı açlış fiyatından büyükse yeşil dön.
+        return { color: "#1db2f5" };
+        }
+        }
+        }
+    </text>))
+    .Panes(p =>
+    {
+        p.Add().Name("OpenPrice");
+        p.Add().Name("Volume").Height(80);
+    })
+    .ArgumentAxis(a =>    //x ekseninin özelleştirilmesi
+        a.ArgumentType(ChartDataType.DateTime)
+        .MinVisualRangeLength(l => l.Minutes(10))
+        .VisualRange(v => v.Length(VizTimeInterval.Hour))
+    )
+    .Legend(l => l.Visible(false))
+    .ValueAxis(v => v.Add().PlaceholderSize(50))
+    .Margin(m => m.Right(30))
+    .ScrollBar(s => s.Visible(true))
+    .LoadingIndicator(l => l.Enabled(true))
+    .ZoomAndPan(z => z.ArgumentAxis(ChartZoomAndPanMode.Both))
+    .Tooltip(t =>
+        t.Enabled(true)
+        .Shared(true)
+        .ArgumentFormat("shortDateShortTime")
+        .ContentTemplate(@<text>
+            <% var volume = points.filter(point => point.seriesName === 'Volume')[0]; %>
+            <% var prices = points.filter(point => point.seriesName !== 'Volume')[0]; %>
+            <div class='tooltip-template'>
+                <div><%- argumentText %></div>
+                <div>
+                    <span>OpenTime: </span>
+                    <%- formatCurrency(prices.OpenTime) %>
+                </div>
+                <div>
+                    <span>Open: </span>
+                    <%- formatCurrency(prices.Open) %>
+                </div>
+                <div>
+                    <span>Close: </span>
+                    <%- formatCurrency(prices.Close) %>
+                </div>
+                <div>
+                    <span>Volume: </span>
+                    <%- formatCurrency(prices.Volume) %>
+                </div>
+                <div>
+                    <span>Symbol: </span>
+                    <%- formatNumber(prices.Symbol) %>
+                </div>
+            </div>
+        </text>)
+    )
+    .Crosshair(c => c.Enabled(true).HorizontalLine(hl => hl.Visible(false)))
+) *@
+
+@using BinanceApi.Models
+
+@(Html.DevExtreme().DataGrid<Kline>()
+    .ID("gridContainer")
+    .Visible(false)
+    .ShowBorders(true)
+    .RepaintChangesOnly(true)
+    .HighlightChanges(true)
+    .Columns(columns =>
+    {
+        columns.AddFor(m => m.OpenTime).DataField("openTime")
+            .Width(115)
+            .Format(Format.LongTime);
+
+        columns.AddFor(m => m.Symbol).DataField("symbol");
+
+        columns.AddFor(m => m.Volume).DataField("volume")
+            .Format("#0.####")
+            .CellTemplate(@<text>
+                <span class="<%- data.change > 0 ? 'inc' : 'dec' %>">
+                    <%- text %>
+                </span>
+            </text>);
+
+        columns.AddFor(m => m.Open).DataField("open")
+             .Format("#0.####");
+
+        columns.AddFor(m => m.Close).DataField("close")
+            .Format("#0.####");
+
+    })
+)
+
+
+<script src="~/signalr/signalr-client.js"></script>
+
+<script>
+    var connection = new signalR.HubConnectionBuilder()
+        .withUrl("@Url.Content("~/liveUpdateSignalRHub")")
+        .configureLogging(signalR.LogLevel.Information)
+        .build();
+​
+    $(function () {
+        connection.start()
+            .then(function () {
+                var store = new DevExpress.data.CustomStore({
+                    load: function () {
+                        return connection.invoke("getAllStocks");
+                    },
+                    key: "symbol"
+                });
+                $("#gridContainer").dxDataGrid({
+                    dataSource: store,
+                    visible: true
+                });
+                connection.on("updateStockPrice", function (data) {
+                    store.push([{ type: "update", key: data.symbol, data: data }]);
+                });
+            });
+    });
+</script>
+
+@* <script src="~/lib/microsoft/signalr/dist/browser/signalr.min.js"></script>
+
+<script>
+    var formatCurrency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format;
+    var formatNumber = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format;
+
+    var connection = new signalR.HubConnectionBuilder().withUrl("https://localhost:7210/HubService").build();
+    connection.start().then(() => {
+        connection.invoke("GetList");
+    }).catch((err) => {
+        console.log(err);
+    });
+    $(function () {
+        connection.on("GetListHub", (saleList) => {
+            var chart = $("#chart").dxChart("instance");
+            chart.option("dataSource", saleList);
+        });
+    });
+
+</script>
+ *@
